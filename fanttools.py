@@ -1,6 +1,7 @@
 from random import randint, choice
 from collections import Counter
 import pyowm
+import cfg
 
 
 class Fanttools:
@@ -141,6 +142,55 @@ class Fanttools:
                 "string": string.title()
             }
 
+    # Генератор имён
+    @staticmethod
+    def generate_names(amount: int = 1, male: int = 2, lang: str = 'rus') -> list:
+        data = []
+        names = None
+
+        if lang == 'rus':
+            if int(male) == 0:
+                names = cfg.female_names_rus
+            if int(male) == 1:
+                names = cfg.male_names_rus
+            if int(male) == 2:
+                names = cfg.female_names_rus + cfg.male_names_rus
+
+            for _ in range(amount):
+                name = names[randint(0, len(names) - 1)]  # Имя
+                surname = cfg.surnames_rus[randint(0, len(cfg.surnames_rus) - 1)]  # Фамилия
+                patronymic = cfg.patronymic_rus[randint(0, len(cfg.patronymic_rus) - 1)]  # Очество
+
+                if name in cfg.female_names_rus:
+                    if surname[-1:] == 'й':
+                        surname = surname[:-2] + 'ая'
+                    else:
+                        surname += 'а'
+                    patronymic = patronymic[:-2] + 'на'
+
+                data.append({
+                    'name': name,
+                    'patronymic': patronymic,
+                    'surname': surname,
+                })
+        else:
+            if int(male) == 0:
+                names = cfg.female_names_eng
+            if int(male) == 1:
+                names = cfg.male_names_eng
+            if int(male) == 2:
+                names = cfg.female_names_eng + cfg.male_names_eng
+
+            for _ in range(amount):
+                name = names[randint(0, len(names) - 1)]  # Имя
+                surname = cfg.surnames_eng[randint(0, len(cfg.surnames_eng) - 1)]  # Фамилия
+
+                data.append({
+                    'name': name,
+                    'surname': surname
+                })
+
+        return data
 
 if __name__ == '__main__':
     x = Fanttools.get_weather('perm')

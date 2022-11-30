@@ -1,12 +1,13 @@
 from random import randint, choice
 from collections import Counter
+from sql import Database
 import pyowm
 import cfg
 
 
 class Fanttools:
     def __init__(self):
-        self.db = "Datebase()"
+        self.db = Database()
 
     # Генератор чисел
     @staticmethod
@@ -211,10 +212,38 @@ class Fanttools:
         return temp
 
     # Генератор ников
-    def generate_nicknames(self, amount: int = 1):
+    def generate_nicknames(self, amount: int = 1) -> list:
         nicknames = self.db.get_nicknames(amount)
         return nicknames
 
+    # Генератор цитат
+    def generate_quotes(self) -> dict:
+        quote = self.db.get_quote()
+        return quote
+
+    # Генератор слоганов
+    def generate_slogans(self, string: str) -> str:
+        slogan = self.db.get_slogan()
+        slogan = slogan.replace('$NAME', string.strip().upper())  # Замена перменной $NAME на name
+
+        return slogan
+
+    # Слово из букв
+    def word_of_letters(self, letters: str):
+        out_words = []  # Слова
+        words = self.db.get_words()
+
+        for word in words:
+            wl = list(word)  # Разделение слова на буквы
+            for letter in letters:
+                if letter in wl:
+                    wl.remove(letter)
+            if not wl:
+                out_words.append(word)
+
+        return out_words
+
+
 if __name__ == '__main__':
-    x = Fanttools.get_weather('perm')
+    x = Fanttools().generate_slogans("Julsi")
     print(x)

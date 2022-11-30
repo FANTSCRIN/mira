@@ -49,6 +49,45 @@ class Database:
 
         return nicknames
 
+    # Получение случайной записи из таблицы Цитат
+    def get_quote(self) -> dict:
+        conn, cur = self.connect_db(name_db='fanttools')
+
+        cur.execute("SELECT * FROM quotes ORDER BY RANDOM() LIMIT 1")
+        rows = cur.fetchall()
+
+        self.disconnect_db_commit(conn=conn, cur=cur)
+
+        return {
+            'quote': rows[0][1].strip(),
+            'author': rows[0][2].strip()
+        }
+
+    # Получение случайной записи из таблицы SLOGANS
+    def get_slogan(self) -> str:
+        conn, cur = self.connect_db(name_db='fanttools')
+
+        cur.execute("SELECT * FROM slogans ORDER BY RANDOM() LIMIT 1")
+        rows = cur.fetchall()
+
+        self.disconnect_db_commit(conn=conn, cur=cur)
+
+        return rows[0][1]
+
+    # Получение записей из таблицы WORDS
+    def get_words(self) -> list:
+        conn, cur = self.connect_db(name_db='fanttools')
+
+        cur.execute("SELECT * FROM words")
+        rows = cur.fetchall()
+
+        self.disconnect_db_commit(conn=conn, cur=cur)
+
+        words = []
+        for row in rows:
+            words.append(row[1])
+
+        return list(set(words))
 
 if __name__ == '__main__':
     x = Database().get_nicknames(amount=5)

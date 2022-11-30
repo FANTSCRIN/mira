@@ -192,6 +192,29 @@ class Fanttools:
 
         return data
 
+    # Погода
+    @staticmethod
+    def get_weather(city: str) -> float:
+        owm = pyowm.OWM('cc837e99a6726cff982db6372bf41e3b')
+        mgr = owm.weather_manager()
+        observation = None
+
+        try:
+            observation = mgr.weather_at_place(city)
+        except Exception as message:
+            if str(message) == 'Unable to find the resource':
+                return False
+
+        w = observation.weather
+        temp = w.temperature('celsius')['temp']
+
+        return temp
+
+    # Генератор ников
+    def generate_nicknames(self, amount: int = 1):
+        nicknames = self.db.get_nicknames(amount)
+        return nicknames
+
 if __name__ == '__main__':
     x = Fanttools.get_weather('perm')
     print(x)

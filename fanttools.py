@@ -1,8 +1,11 @@
+from configs.config import EMOJI
+from bs4 import BeautifulSoup as bs
 from random import randint, choice
 from collections import Counter
 from sql import Database
+import configs.config_fanttools as cfg
+import requests
 import pyowm
-import cfg
 
 
 class Fanttools:
@@ -229,7 +232,7 @@ class Fanttools:
         return slogan
 
     # Слово из букв
-    def word_of_letters(self, letters: str):
+    def word_of_letters(self, letters: str) -> list:
         out_words = []  # Слова
         words = self.db.get_words()
 
@@ -239,11 +242,263 @@ class Fanttools:
                 if letter in wl:
                     wl.remove(letter)
             if not wl:
-                out_words.append(word)
+                if len(word) > 1:
+                    out_words.append(word)
 
         return out_words
 
+    # Проверка номера телефона
+    @staticmethod
+    def check_phone_number(number_phone: str) -> dict:
+        def parse(url):
+            try:
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                                  'Chrome/98.0.4758.119 YaBrowser/22.3.0.2430 Yowser/2.5 Safari/537.36',
+                }
+                response = requests.get(url=url, headers=headers)
+                html = bs(response.content, 'html.parser')
+                response.close()
+            except:
+                html = None
+
+            return html
+
+        # Получение оценок
+        def get_points(html):
+            points = []
+            data = html.select('.categories > ul > li')
+
+            for point in data:
+                points.append(point.text)
+
+            return points
+
+        # Получение информации с сайтов
+        def get_info():
+            # Сайт 'callfilter.app'
+            html = parse(f'https://callfilter.app/{number_phone}')
+            if html:
+                # Описание информации номера телефона
+                description = html.select('.mainInfoHeader > .number > span')[0].text.strip().lower()
+                # Проврека на наличие инфомации
+                if 'нет рейтинга' not in description.lower():
+                    return get_points(html)
+
+        # Получение названия старны и города
+        def get_country():
+            html = parse(f'https://sanstv.ru/codes/code-%2B{number_phone}')
+            data = html.select('#resulttable > tbody > tr')[0].select('td')
+
+            country = data[2].text
+            city = data[4].text
+
+            return {'country': country, 'city': city}
+
+        responses = {
+            'country': get_country(),
+            'info': get_info()
+        }
+
+        # Информация о телефоне
+        info_number = {
+            'emoji': None,
+            'country': None,
+            'city': None,
+            'points': None,
+            'number': number_phone
+        }
+
+        # Добавление ИНФОРМАЦИИ
+        # Страна и город
+        if responses['country']['country'] != '':
+            info_number['country'] = responses['country']['country']
+        if responses['country']['city'] != '':
+            info_number['city'] = responses['country']['city']
+
+        # Эмоджи
+        if info_number['country'].lower() in cfg.EMOJI_COUNTRIES:
+            info_number['emoji'] = cfg.EMOJI_COUNTRIES[info_number['country'].lower()]
+        else:
+            info_number['emoji'] = EMOJI['world']
+
+        # Оценки
+        info_number['points'] = responses['info']
+
+        return info_number
+
+    # Генератор команд
+    @staticmethod
+    def generate_teams(members: int or list, team_names: int or list) -> list:
+        teams = []  # Сгенированные команды
+        list_team_names = []  # Стандартные названия команд
+        list_members = []  # Стандартные названия участников
+        list_teams = []
+
+        # Создание стандартных названий команд
+        def set_list_names_teams():
+            for i in range(team_names):
+                list_team_names.append('Team ' + str(i + 1))
+
+        # Создание стандартных названий участников
+        def set_list_members():
+            for i in range(members):
+                list_members.append('Member ' + str(i + 1))
+
+        # Участники представлены числом
+        if type(members) == int:
+            set_list_members()
+            # Названия команд представлены числом
+            if type(team_names) == int:
+                set_list_names_teams()
+            else:
+                list_team_names = team_names
+        else:
+            list_members = members
+            # Названия команд представлены числом
+            if type(team_names) == int:
+                set_list_names_teams()
+            else:
+                list_team_names = team_names
+
+        # Создание команд
+        for name in list_team_names:
+            teams.append({
+                'name': name.strip(),
+                'members': []
+            })
+
+        # Распределение участников по командам
+        amount_members = len(list_members)  # Кол-во участников
+        for _ in range(amount_members):
+            if not list_teams:
+                for team in teams:
+                    list_teams.append(team['name'])
+            member = list_members[randint(0, len(list_members) - 1)]
+            name_team = list_teams[randint(0, len(list_teams) - 1)]
+            list_members.remove(member)
+            list_teams.remove(name_team)
+            for team in teams:
+                if team['name'] == name_team:
+                    team['members'].append(member.strip())
+
+        return teams
+
+    # Системы счисления
+    @staticmethod
+    def numeral_system(numeral_1: int = None, number_1: int or float = None,
+                       numeral_2: int = None, number_2: int or float = None, act: str = None) -> str or int or float:
+
+        # Обрезание нулей с права от числа
+        def cut_zero(number):
+            while True:
+                if number[-1::] == '0':
+                    number = number[:-1:]
+                else:
+                    break
+            return number
+
+        # Перевод числа
+        def convert_base(number, from_base, to_base):
+            alpha = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+            def to_base_int(num, base):
+                n = abs(num)
+                b = alpha[n % base]
+
+                while n >= base:
+                    n = n // base
+                    b += alpha[n % base]
+
+                return ('' if num >= 0 else '-') + b[::-1]
+
+            def to_base_frac(frac, base, n=10):
+                b = ''
+
+                while n:
+                    frac *= base
+                    frac = round(frac, n)
+                    b += str(int(frac))
+                    frac -= int(frac)
+                    n -= 1
+
+                return b
+
+            if '.' in number:
+                num, frac = map(str, number.split('.'))
+                num = int(num, from_base)
+                a = to_base_int(num, to_base)
+                b = 0
+                k = from_base
+
+                for i in frac:
+                    b += alpha.index(i) / k
+                    k *= from_base
+
+                b = to_base_frac(b, to_base)
+                number = cut_zero(a + '.' + b)
+
+                return number
+            else:
+                return to_base_int(int(number, from_base), to_base)
+
+        # Проверка правильности числа
+        def check_number(number, from_base):
+            for num in number:
+                if num == '.':
+                    continue
+                if num == 'A':
+                    num = 10
+                if num == 'B':
+                    num = 11
+                if num == 'C':
+                    num = 12
+                if num == 'D':
+                    num = 13
+                if num == 'E':
+                    num = 14
+                if num == 'F':
+                    num = 15
+
+                if int(num) >= from_base:
+                    return False
+
+            return True
+
+        if not act:
+            if check_number(number_1, numeral_1):
+                return convert_base(number_1, numeral_1, numeral_2)
+            else:
+                return 'Ошибка: Неправильное число!'
+        else:
+            if act in ['-', '+', '*', '/']:
+                if check_number(number_1, numeral_1) and check_number(number_2, numeral_1):
+                    def float_or_int(number):
+                        if '.' in number:
+                            return float(number)
+                        else:
+                            return int(number)
+
+                    number_1 = float_or_int(convert_base(number_1, numeral_1, 10))
+                    number_2 = float_or_int(convert_base(number_2, numeral_1, 10))
+
+                    if act == '+':
+                        number = number_1 + number_2
+                    if act == '-':
+                        number = number_1 - number_2
+                    if act == '*':
+                        number = number_1 * number_2
+                    if act == '/':
+                        number = number_1 * number_2
+
+                    return convert_base(str(number), 10, numeral_1)
+                else:
+                    return 'Ошибка: Неправильное число!'
+            else:
+                return 'Ошибка: Такого действия нет!'
+
+
 
 if __name__ == '__main__':
-    x = Fanttools().generate_slogans("Julsi")
+    x = Fanttools().check_phone_number('79173416048')
     print(x)

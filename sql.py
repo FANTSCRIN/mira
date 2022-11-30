@@ -89,6 +89,7 @@ class Database:
 
         return list(set(words))
 
+
 if __name__ == '__main__':
     x = Database().get_nicknames(amount=5)
     print(x)

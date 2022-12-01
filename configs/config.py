@@ -72,5 +72,6 @@ EMOJI = {
     'stars': '✨',
     'money_bag': '💰',
     'handshake': '🤝',
-    'information': 'ℹ'
+    'information': 'ℹ',
+    'back': '🔙'
 }

@@ -89,7 +89,73 @@ class Database:
 
         return list(set(words))
 
+    # Получение записи из таблицы Цитат
+    def get_anecdote(self) -> str:
+        conn, cur = self.connect_db(name_db='fanttools')
+
+        cur.execute("SELECT * FROM anecdotes ORDER BY RANDOM() LIMIT 1")
+        rows = cur.fetchall()
+
+        self.disconnect_db_commit(conn=conn, cur=cur)
+
+        return rows[0][1]
+
+    # Получение городов и стран
+    def get_cities_and_country(self, name: str) -> dict:
+        conn, cur = self.connect_db(name_db='fanttools')
+
+        cur.execute("SELECT cities.name_, cities.other_name, cities.description, cities.picture, countries.name_, "
+                    "countries.other_name, countries.description, countries.picture "
+                    "FROM cities "
+                    "INNER JOIN countries ON cities.country_id = countries.country_id "
+                    "WHERE cities.name_ = %s or countries.name_ = %s or countries.name_ = %s",
+                    (name, name, name.upper()))
+        rows = cur.fetchall()
+
+        self.disconnect_db_commit(conn=conn, cur=cur)
+
+        if rows:
+            if name == rows[0][0]:
+                if len(rows) == 1:
+                    city = {
+                        "name": rows[0][0],
+                        "other_name": rows[0][1],
+                        "description": rows[0][2],
+                        "picture": rows[0][3],
+                        "name_country": rows[0][4]
+                    }
+
+                    return {'type': 'city', 'data': [city]}
+                else:
+                    data = []
+                    for row in rows:
+                        city = {
+                            "name": row[0],
+                            "other_name": row[1],
+                            "description": row[2],
+                            "picture": row[3],
+                            "name_country": row[4]
+                        }
+
+                        data.append(city)
+
+                    return {'type': 'city', 'data': data}
+            else:
+                country = {
+                    "name": rows[0][4],
+                    "other_name": rows[0][5],
+                    "description": rows[0][6],
+                    "picture": rows[0][7],
+                    "cities": []
+                }
+
+                for row in rows:
+                    country['cities'].append(row[0])
+
+                country['cities'].sort()
+                return {'type': 'country', 'data': country}
+
 
 if __name__ == '__main__':
-    x = Database().get_nicknames(amount=5)
+    x = Database().get_cities_and_country('пермь')
     print(x)

@@ -1,11 +1,12 @@
-from configs.config import EMOJI
+from configs.config_fanttools import *
 from bs4 import BeautifulSoup as bs
 from random import randint, choice
+from configs.config import EMOJI
 from collections import Counter
 from sql import Database
-import configs.config_fanttools as cfg
 import requests
 import pyowm
+import re
 
 
 class Fanttools:
@@ -154,18 +155,18 @@ class Fanttools:
 
         if lang == 'rus':
             if int(male) == 0:
-                names = cfg.female_names_rus
+                names = female_names_rus
             if int(male) == 1:
-                names = cfg.male_names_rus
+                names = male_names_rus
             if int(male) == 2:
-                names = cfg.female_names_rus + cfg.male_names_rus
+                names = female_names_rus + male_names_rus
 
             for _ in range(amount):
                 name = names[randint(0, len(names) - 1)]  # Имя
-                surname = cfg.surnames_rus[randint(0, len(cfg.surnames_rus) - 1)]  # Фамилия
-                patronymic = cfg.patronymic_rus[randint(0, len(cfg.patronymic_rus) - 1)]  # Очество
+                surname = surnames_rus[randint(0, len(surnames_rus) - 1)]  # Фамилия
+                patronymic = patronymic_rus[randint(0, len(patronymic_rus) - 1)]  # Очество
 
-                if name in cfg.female_names_rus:
+                if name in female_names_rus:
                     if surname[-1:] == 'й':
                         surname = surname[:-2] + 'ая'
                     else:
@@ -179,15 +180,15 @@ class Fanttools:
                 })
         else:
             if int(male) == 0:
-                names = cfg.female_names_eng
+                names = female_names_eng
             if int(male) == 1:
-                names = cfg.male_names_eng
+                names = male_names_eng
             if int(male) == 2:
-                names = cfg.female_names_eng + cfg.male_names_eng
+                names = female_names_eng + male_names_eng
 
             for _ in range(amount):
                 name = names[randint(0, len(names) - 1)]  # Имя
-                surname = cfg.surnames_eng[randint(0, len(cfg.surnames_eng) - 1)]  # Фамилия
+                surname = surnames_eng[randint(0, len(surnames_eng) - 1)]  # Фамилия
 
                 data.append({
                     'name': name,
@@ -248,22 +249,7 @@ class Fanttools:
         return out_words
 
     # Проверка номера телефона
-    @staticmethod
-    def check_phone_number(number_phone: str) -> dict:
-        def parse(url):
-            try:
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                                  'Chrome/98.0.4758.119 YaBrowser/22.3.0.2430 Yowser/2.5 Safari/537.36',
-                }
-                response = requests.get(url=url, headers=headers)
-                html = bs(response.content, 'html.parser')
-                response.close()
-            except:
-                html = None
-
-            return html
-
+    def check_phone_number(self, number_phone: str) -> dict:
         # Получение оценок
         def get_points(html):
             points = []
@@ -277,7 +263,7 @@ class Fanttools:
         # Получение информации с сайтов
         def get_info():
             # Сайт 'callfilter.app'
-            html = parse(f'https://callfilter.app/{number_phone}')
+            html = self.parse_html(f'https://callfilter.app/{number_phone}')
             if html:
                 # Описание информации номера телефона
                 description = html.select('.mainInfoHeader > .number > span')[0].text.strip().lower()
@@ -287,7 +273,7 @@ class Fanttools:
 
         # Получение названия старны и города
         def get_country():
-            html = parse(f'https://sanstv.ru/codes/code-%2B{number_phone}')
+            html = self.parse_html(f'https://sanstv.ru/codes/code-%2B{number_phone}')
             data = html.select('#resulttable > tbody > tr')[0].select('td')
 
             country = data[2].text
@@ -317,8 +303,8 @@ class Fanttools:
             info_number['city'] = responses['country']['city']
 
         # Эмоджи
-        if info_number['country'].lower() in cfg.EMOJI_COUNTRIES:
-            info_number['emoji'] = cfg.EMOJI_COUNTRIES[info_number['country'].lower()]
+        if info_number['country'].lower() in EMOJI_COUNTRIES:
+            info_number['emoji'] = EMOJI_COUNTRIES[info_number['country'].lower()]
         else:
             info_number['emoji'] = EMOJI['world']
 
@@ -497,8 +483,98 @@ class Fanttools:
             else:
                 return 'Ошибка: Такого действия нет!'
 
+    # Гороскоп
+    def horoscope(self, sign: str) -> dict or bool:
+        if sign in HOROSCOPE_SIGNS:
+            data_sign = HOROSCOPE_SIGNS[sign]
+        else:
+            return False
+
+        url = 'https://1001goroskop.ru/?znak=' + data_sign['name']  # Сайт с гороскопами
+        html = self.parse_html(url=url)
+
+        txt = html.select('#eje_text')[0].text.replace('Д. и Н. Зима для *1001 гороскоп*', '')
+
+        return {
+            'txt': txt,
+            'date': data_sign['date_text'],
+            'name_lat': data_sign['name'],
+            'name': sign.title()
+        }
+
+    # Парсинг страницы
+    @staticmethod
+    def parse_html(url: str):
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                              'Chrome/98.0.4758.119 YaBrowser/22.3.0.2430 Yowser/2.5 Safari/537.36',
+            }
+            response = requests.get(url=url, headers=headers)
+            html = bs(response.content, 'html.parser')
+            response.close()
+        except:
+            html = None
+
+        return html
+
+    # Текст песени и аккорды
+    def get_text_or_chords(self, singer: str, name_song: str) -> str or bool:
+        string_search = f'{singer}+{name_song.replace(" ", "+")}'  # Строка названия песни для запроса
+        url = f'https://amdm.ru/search/?q={string_search}'         # url запроса
+
+        html = self.parse_html(url=url)
+
+        not_found = html.select('.content-table > article > h1')[0].text       # Текст поиска
+        if 'поиск на сайте' in not_found.lower():
+            data = html.select('.artist_name > a')
+            if singer == data[0].text.lower() and name_song == data[1].text.lower():
+                url_song = data[1].attrs['href']                               # Ссылка на песню
+                html = self.parse_html(url=url_song)
+                text_song = str(html.select('.b-podbor__text > pre')[0].text)  # Блок html кода с текстом песни
+                text_song = re.sub('(<.+?>)', "", text_song)                   # Преобразование текста песни
+
+                return text_song
+
+        return False
+
+    # Генератор анекдотов
+    def generate_anecdotes(self) -> str:
+        anecdote = self.db.get_anecdote()
+
+        # Удаление переносов строк
+        anecdote = anecdote.replace('\n', '')
+
+        # # Замена всех маленьких дефисов на большие
+        anecdote = anecdote.replace('-', '—')
+
+        # Замена большого дефиса на маленький
+        matchs = re.findall('(\w+—\w+)', anecdote)
+        for match in matchs:
+            new_text = re.sub('—', '-', match)
+            anecdote = re.sub(match, new_text, anecdote)
+
+        # Добавление переносов строк
+        anecdote = re.sub('(\s?—\s)', '\n— ', anecdote)
+        if anecdote[0] == '\n':
+            anecdote = anecdote[1:]
+
+        # Знаки препинания
+        anecdote = anecdote.replace('.', '. ')
+        anecdote = anecdote.replace('!', '! ')
+        anecdote = anecdote.replace('?', '? ')
+        anecdote = anecdote.replace(',', ', ')
+        anecdote = anecdote.replace('  ', ' ')
+        anecdote = anecdote.replace('. . .', '...')
+
+        return anecdote.strip()
+
+    # Получение инофрмации о городе или стране
+    def info_city(self, name: str) -> dict:
+        info = self.db.get_cities_and_country(name.lower().title())
+        return info
 
 
 if __name__ == '__main__':
-    x = Fanttools().check_phone_number('79173416048')
+    x = Fanttools().info_city('пермь')
     print(x)

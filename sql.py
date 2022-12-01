@@ -89,7 +89,7 @@ class Database:
 
         return list(set(words))
 
-    # Получение записи из таблицы Цитат
+    # Получение случайной записи из таблицы Анекдотов
     def get_anecdote(self) -> str:
         conn, cur = self.connect_db(name_db='fanttools')
 
